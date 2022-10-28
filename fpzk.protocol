@@ -1,0 +1,133 @@
+===================
+	特殊注意事项
+===================
+* 以下所有时间相关参数，请注意时间同步服务的精度。然后再对接收到的参数做出修正。
+* 以下所有时间相关参数，请注意网络波动导致的时间同步服务异常，导致的次生异常。并对接收到的参数，做出修正。
+
+===================
+	外部接口
+===================
+---------------
+0. 字段结构
+---------------
+
+nodeInfoFields 成员:
+"endpoint", "region", "srvVersion", "registerTime", "lastMTime", "online",
+"tcpNum", "udpNum", "loadAvg", "cpuUsage",
+"ipv4", "ipv6", "domain", 
+"port", "port6", "sslport", "sslport6", "uport", "uport6",
+"gpu", "extra"
+
+未来保留增加:
+uipv4, uipv6, sslipv4, sslipv6
+的可能。
+
+GPUInfo:
+GPUInfo 有两种格式 [[%d]] 与 { %s: [[%d]] }
+第一种格式中，GPUInfo 为一个二维队列。第一维是卡的维度，上报了 N 张卡的信息，第一维就有 N 条记录。
+第二维是卡的信息维度，为 5 个整型，分别是：
+  GPU卡的索引编号、GPU的利用率（单位：%）、显存的利用率（单位：%）、已使用的显存（单位：字节）、总显存（单位：字节）。
+
+第二种格式中，字典的 key 为 IP 字符串，键值为第一种格式。
+
+---------------
+1.syncServerInfo:
+---------------
+# externalVisible: default is true
+# publishEndpoint: default is true
+# startTime: milliseconds
+=> syncServerInfo { project:%s, projectToken:%s, ?serviceName:%s, ?cluster:%s, ?srvVersion:%s, ?endpoint:%s, ?tcpNum:%d, ?udpNum:%d, ?perCPULoad:%f, ?perCPUUsage:%f, ?GPUInfo:[[%d]], ?extra:%B, ?online:%b, ?startTime:%d, ?port:%d, ?port6:%d, ?sslport:%d, ?sslport6:%d, ?uport:%d, ?uport6:%d, ?domain:%s, ?ipv4:%s, ?ipv6:%s, ?externalVisible:%b, ?publishEndpoint:%b, ?interests:[%s]}
+<= { services:[%s], revisions:[%d], clusterAlteredTimes:[%d] }
+
+---------------
+2. getServiceInfo:
+---------------
+# nodeInfoFields: 参见 "0. 字段结构"
+# srvNodes:[service level: [ node level: [column of fields] ] ], srvNodes 可能没有最后一个 extra 字段
+# clusterAlteredTimes is in milliseconds
+# GPUInfo 的 key 为 IP
+
+=> getServiceInfo {project:%s, projectToken:%s, services:[%s]}
+<= { services:[%s], revisions:[%d], clusterAlteredTimes:[%d], nodeInfoFields:[%s], srvNodes:[[[%s]]], invalidServices:[%s], ?GPUInfo:{%s:[[%d]]} }
+
+---------------
+3. getServiceNames:
+---------------
+=> getServiceNames {project:%s, projectToken:%s}
+<= { services:[%s] } 
+
+---------------
+4. subscribeServicesChange:
+---------------
+# nodeInfoFields: 参见 "0. 字段结构"
+# srvNodes:[service level: [ node level: [column of fields] ] ], srvNodes 可能没有最后一个 extra 字段
+# clusterAlteredTimes is in milliseconds
+# GPUInfo 的 key 为 IP
+
+=> subscribeServicesChange {project:%s, projectToken:%s, services:[%s]}
+<= { services:[%s], revisions:[%d], clusterAlteredTimes:[%d], nodeInfoFields:[%s], srvNodes:[[[%s]]], invalidServices:[%s], ?GPUInfo:{%s:[[%d]]} }
+
+	---------------
+	4.1 QuestProcessor in FPZK client
+	---------------
+	# nodeInfoFields: 参见 "0. 字段结构"
+	# srvNodes:[service level: [ node level: [column of fields] ] ], srvNodes 可能没有最后一个 extra 字段
+	# clusterAlteredTimes is in milliseconds
+	# GPUInfo 的 key 为 IP
+
+	=> servicesChange { services:[%s], revisions:[%d], clusterAlteredTimes:[%d], nodeInfoFields:[%s], srvNodes:[[[%s]]], invalidServices:[%s], ?GPUInfo:{%s:[[%d]]} }
+	<= {}
+
+---------------
+5. unregisterService:
+---------------
+=> unregisterService {project:%s, projectToken:%s, serviceName:%s, endpoint:%s, ?cluster:%s}
+<= {}
+
+
+===================
+	内部接口
+===================
+
+---------------
+1. internalSyncServiceInfos:
+---------------
+# fields (internal):
+	"endpoint", "srvVersion", "registerTime", "startTime", "online",
+	"tcpNum", "udpNum", "loadAvg", "cpuUsage",
+	"ipv4", "ipv6", "domain",
+	"port", "port6", "sslport", "sslport6", "uport", "uport6",
+	"gpu", "extra"
+
+# updateNodes: { project: { service: [%s] } }, updateNodes 可能没有最后一个 extra 字段
+# unregistered: { project: { service: {endpoint: startTime} } }
+# GPUInfo: { project: { IP: [[%d]] } }
+# if 'gpu' field in fields is not empty, means requiring GPU data in GPUInfo. 
+
+# => internalSyncServiceInfos { fields:[%s], updateNodes:{%s:{%s:[[%s]]}}, unregistered:{ %s:{%s:{%s:%d} } }, ?GPUInfo:{ %s:{%s:[[%d]]} } }
+# <= {}
+
+---------------
+2. externalSyncServiceInfos:
+---------------
+# fields (external):
+	"endpoint", "srvVersion", "registerTime", "startTime", "online",
+	"ipv4", "ipv6", "domain",
+	"port", "port6", "sslport", "sslport6", "uport", "uport6"
+
+# updateNodes: { project: { service: [%s] } }
+# unregistered: { project: { service: {endpoint: startTime} } }
+# internal: 是否是内部二次转发。Default is false.
+
+# => externalSyncServiceInfos { region:%s, fields:[%s], updateNodes:{%s:{%s:[[%s]]}}, unregistered:{ %s:{%s:{%s:%d} } }, ?internal:%b }
+# <= {}
+
+
+----------------------------
+ Exception
+----------------------------
+
+# ------------------------------------------------
+# 30301: project not found.
+# 30302: project token not matched.
+# 30400: Server is warmig up.

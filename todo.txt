@@ -1,0 +1,4 @@
+TODO：
+
+1. 当所有 FPZKServer 升级到 3.1.0 及以上版本后，buildInternalSyncedServiceInfos() 及 fetchServiceInfos() 函数内，不用 MachineInfo 时，队列中的相关字符串改为空串。
+2. buildInternalSyncedServiceInfos() 内对机器状态信息字符串开始是否为'-'的判断去掉。FPNN FPZKClient 做类似改动。
